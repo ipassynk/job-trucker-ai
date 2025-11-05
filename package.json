@@ -1,0 +1,17 @@
+{
+  "name": "job-trucker-ai",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev:all": "pnpm exec turbo run dev",
+    "build:all": "pnpm exec turbo run build"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.20.0",
+  "devDependencies": {
+    "turbo": "^2.6.0"
+  }
+}
