@@ -17,7 +17,5 @@ document.getElementById("saveBtn").addEventListener("click", async () => {
         html: result
       })
     });
-  
-    alert("Job page sent to server!");
   });
   
