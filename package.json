@@ -5,7 +5,12 @@
   "main": "index.js",
   "scripts": {
     "dev:all": "pnpm exec turbo run dev",
-    "build:all": "pnpm exec turbo run build"
+    "dev:client": "pnpm exec turbo run dev --filter=client",
+    "build:all": "pnpm exec turbo run build",
+    "build:extension": "pnpm exec turbo run build --filter=extension",
+    "run:agent": "cd apps/agent && bash start_agent.sh",
+    "run:client": "cd apps/client && bash start_client.sh",
+    "run:server": "cd apps/server && bash start_server.sh"
   },
   "keywords": [],
   "author": "",

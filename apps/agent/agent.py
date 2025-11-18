@@ -182,16 +182,15 @@ def save_job_to_vector_db(
 
 
 if __name__ == "__main__":
-    # Example usage
+    # FIXME
     json_file_path = os.path.join(
         os.path.dirname(os.path.dirname(__file__)),
         "server",
         "jobs",
-        "2025-11-05_11-21-50.json",
+        "2025-11-18_15-29-31.json",
     )
 
     try:
-        # Read the JSON file to get URL and timestamp
         with open(json_file_path, "r", encoding="utf-8") as f:
             json_data = json.load(f)
 

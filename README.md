@@ -2,6 +2,8 @@
 
 A comprehensive job search automation tool that leverages Large Language Models (LLMs), Retrieval-Augmented Generation (RAG), and fine-tuning techniques to streamline the job application process. This project is designed to help senior software developers efficiently manage and analyze job postings, eliminating the frustration of manual job searching.
 
+![alt text](image.png)
+
 ## Status
 
 **This project is currently in active development.**
@@ -109,4 +111,58 @@ This project is being developed to:
 ## Contributing
 
 This project is currently in active development by a senior software developer exploring the intersection of AI and practical job search automation.
+
+**Note:** This project uses the `llama3.2` model with Ollama.  
+Before running anything, make sure to pull the model by running:
+
+```sh
+ollama pull llama3.2
+```
+
+## Quick Start
+
+Follow these steps to use the job assistant system:
+
+1. **Install and Add the Browser Extension**
+    - Go to the `extension` folder and follow the instructions in its `README.md` to load the extension into your browser (typically via "Load unpacked" in Chrome/Brave/Edge or using developer mode).
+    - This extension allows you to send any job web page to your local job agent by simply clicking on the extension button.
+
+2. **Start the Job Agent Server**
+    - In your main project directory, start the FastAPI server that receives and processes job data:
+      ```sh
+      uvicorn apps.server.main:app --reload
+      ```
+    - Make sure you have all required Python dependencies installed.
+
+3. **Start the Chat Client**
+    - To interact with your job database using natural language, start the Streamlit frontend:
+      ```sh
+      streamlit run apps/client/app.py
+      ```
+
+4. **Start the Agent Service (if separate)**
+    - If your retrieval-augmented generation (RAG) agent is run as a separate service, launch it:
+      ```sh
+      python apps/agent/agent.py
+      ```
+    - This will enable local LLM-based extraction, search, and chat with your job database.
+
+5. **Capture a Job Posting via Browser Extension**
+    - Browse to a job posting page in your browser.
+    - Click the extension icon to send the current page (URL and HTML) to your local server.  
+      The backend will extract and store job information automatically.
+
+6. **Ask Questions in the Chat Client**
+    - In the Streamlit web interface, you can now ask questions such as:
+      - "Show me all Python developer jobs."
+      - "What is the highest salary I have saved?"
+      - "Which jobs mention remote work?"
+    - The system will semantically search and answer based on your saved job postings.
+
+**Tip:** For more detailed setup of the browser extension, view the `extension/README.md`.
+
+
+
+
+
 

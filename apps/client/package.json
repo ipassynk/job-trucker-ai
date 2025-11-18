@@ -1,0 +1,9 @@
+{
+  "name": "client",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "bash start_client.sh"
+  }
+}
+

@@ -78,4 +78,7 @@ Thumbs.db
 jobs/
 *.json.bak
 .cache/
+.cursor/
+.turbo/
+.history/
 
