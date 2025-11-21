@@ -11,11 +11,19 @@ env_path = Path("/opt/airflow") / ".env"
 if env_path.exists():
     load_dotenv(dotenv_path=env_path)
 
+def _on_failure_callback(context):
+    """Callback function to execute when a task fails."""
+    print(f"Task {context['task_instance'].task_id} failed")
+    print(f"Error: {context['exception']}")
+    print(f"Traceback: {context['traceback']}")
+
 @dag(
     dag_id="jobs_dag",
     start_date=datetime(2025, 1, 1),
-    schedule=None,
+    schedule='@daily',
     catchup=False,
+    default_args={'on_failure_callback': _on_failure_callback}
+    on_failure_callback=_on_failure_callback
 )
 def jobs_dag():
 
@@ -114,9 +122,9 @@ def jobs_dag():
  
     _extracted_jobs = process_single_job.expand(job_file=_list_jobs)
     
-    @task(pool='job_processing_pool', pool_slots=1)
-    def load_single_job_to_vector_db(job_data: Dict) -> None:
-        """Load a single job to vector database. Limited to 1 concurrent execution via pool."""
+    @task
+    def load_job_to_vector_db(job_data: Dict) -> None:
+        """Load a job to vector database."""
         from apps.database import get_vector_db
         from apps.rag import save_job_to_vector_db, JobInfo
         
@@ -143,10 +151,9 @@ def jobs_dag():
             print(f"Error saving job to vector DB: {e}")
             # Don't raise - allows other jobs to continue processing
 
-    # Use .expand() to create one task per extracted job (but limited to 1 concurrent via pool)
-    _load_embeddings_to_vector_db = load_single_job_to_vector_db.expand(job_data=_extracted_jobs)
+    _load_job_to_vector_db = load_job_to_vector_db.expand(job_data=_extracted_jobs)
     
     # dependencies
-    _create_collection_if_not_exists >> _list_jobs >> _extracted_jobs >> _load_embeddings_to_vector_db
+    _create_collection_if_not_exists >> _list_jobs >> _extracted_jobs >> _load_job_to_vector_db
 
 dag_instance = jobs_dag()
