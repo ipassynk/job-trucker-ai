@@ -168,6 +168,7 @@ curl -LfO 'https://airflow.apache.org/docs/apache-airflow/2.10.2/docker-compose.
 echo -e "AIRFLOW_UID=$(id -u)" > .env
 docker compose up airflow-init
 docker compose run
+docker compose exec airflow-webserver airflow pools set job_processing_pool 1 "Pool for job processing tasks"
 
 
 

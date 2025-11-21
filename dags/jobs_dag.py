@@ -69,72 +69,82 @@ def jobs_dag():
     
     _list_jobs = list_jobs()
     
-    @task
-    def process_all_jobs_sequentially(job_files: List[Dict[str, str]]) -> List[Dict]:
-        """Process all job files sequentially in a single task."""
+    @task(pool='job_processing_pool', pool_slots=1)
+    def process_single_job(job_file: Dict[str, str]) -> Dict:
+        """Process a single job file. Limited to 1 concurrent execution via pool."""
         import json
         from apps.rag import extract_job_info
-        extracted_jobs = []
         
-        for job_file in job_files:
-            file_path = job_file["file_path"]
-            try:
-                print(f"Processing job file: {file_path}")
-                with open(file_path, "r", encoding="utf-8") as f:
-                    json_data = json.load(f)
-                    url = json_data.get("url", "")
-                    timestamp = json_data.get("date", "")
-                
-                job_info = extract_job_info(file_path)
-                
-                # Convert Pydantic model to dict for Airflow XCom
-                extracted_jobs.append({
-                    "position_name": job_info.position_name,
-                    "position_description": job_info.position_description,
-                    "company": job_info.company,
-                    "salary": job_info.salary,
-                    "url": url,
-                    "timestamp": timestamp,
-                    "file_path": file_path
-                })
-                print(f"Processed job: {job_info.position_name} at {job_info.company}")
-            except Exception as e:
-                print(f"Error extracting job info from {file_path}: {e}")
-                raise
-        
-        return extracted_jobs
+        file_path = job_file["file_path"]
+        try:
+            print(f"Processing job file: {file_path}")
+            with open(file_path, "r", encoding="utf-8") as f:
+                json_data = json.load(f)
+                url = json_data.get("url", "")
+                timestamp = json_data.get("date", "")
+            
+            job_info = extract_job_info(file_path)
+            
+            # Convert Pydantic model to dict for Airflow XCom
+            result = {
+                "position_name": job_info.position_name,
+                "position_description": job_info.position_description,
+                "company": job_info.company,
+                "salary": job_info.salary,
+                "url": url,
+                "timestamp": timestamp,
+                "file_path": file_path
+            }
+            print(f"Processed job: {job_info.position_name} at {job_info.company}")
+            return result
+        except Exception as e:
+            error_msg = f"Error extracting job info from {file_path}: {e}"
+            print(error_msg)
+            # Return error info instead of raising - allows other jobs to continue
+            return {
+                "error": str(e),
+                "file_path": file_path,
+                "position_name": None,
+                "position_description": None,
+                "company": None,
+                "salary": None,
+                "url": "",
+                "timestamp": ""
+            }
+ 
+    _extracted_jobs = process_single_job.expand(job_file=_list_jobs)
     
-    _extracted_jobs = process_all_jobs_sequentially(_list_jobs)
-    
-    @task
-    def load_embeddings_to_vector_db(extracted_jobs: List[Dict]) -> None:
-        """Load extracted job information into vector database."""
+    @task(pool='job_processing_pool', pool_slots=1)
+    def load_single_job_to_vector_db(job_data: Dict) -> None:
+        """Load a single job to vector database. Limited to 1 concurrent execution via pool."""
         from apps.database import get_vector_db
         from apps.rag import save_job_to_vector_db, JobInfo
-        vectorstore = get_vector_db()
         
-        for job_data in extracted_jobs:
-            try:
-                job_info = JobInfo(
-                    position_name=job_data["position_name"],
-                    position_description=job_data["position_description"],
-                    company=job_data["company"],
-                    salary=job_data.get("salary")
-                )
-                
-                url = job_data.get("url", "")
-                timestamp = job_data.get("timestamp", "")
-                
-                # Save to vector database
-                doc_id = save_job_to_vector_db(job_info, url, timestamp)
-                print(f"Saved job '{job_info.position_name}' at {job_info.company} to vector DB with ID: {doc_id}")
-            except Exception as e:
-                print(f"Error saving job to vector DB: {e}")
-                raise
+        # Skip if there was an error in processing
+        if job_data.get("error"):
+            print(f"Skipping job with error: {job_data.get('file_path')} - {job_data.get('error')}")
+            return
+        
+        try:
+            job_info = JobInfo(
+                position_name=job_data["position_name"],
+                position_description=job_data["position_description"],
+                company=job_data["company"],
+                salary=job_data.get("salary")
+            )
+            
+            url = job_data.get("url", "")
+            timestamp = job_data.get("timestamp", "")
+            
+            # Save to vector database
+            doc_id = save_job_to_vector_db(job_info, url, timestamp)
+            print(f"Saved job '{job_info.position_name}' at {job_info.company} to vector DB with ID: {doc_id}")
+        except Exception as e:
+            print(f"Error saving job to vector DB: {e}")
+            # Don't raise - allows other jobs to continue processing
 
-    _load_embeddings_to_vector_db = load_embeddings_to_vector_db(
-        extracted_jobs=_extracted_jobs
-    )
+    # Use .expand() to create one task per extracted job (but limited to 1 concurrent via pool)
+    _load_embeddings_to_vector_db = load_single_job_to_vector_db.expand(job_data=_extracted_jobs)
     
     # dependencies
     _create_collection_if_not_exists >> _list_jobs >> _extracted_jobs >> _load_embeddings_to_vector_db
