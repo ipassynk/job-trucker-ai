@@ -2,12 +2,6 @@
 
 A comprehensive job search automation tool that leverages Large Language Models (LLMs), Retrieval-Augmented Generation (RAG), and fine-tuning techniques to streamline the job application process. This project is designed to help senior software developers efficiently manage and analyze job postings, eliminating the frustration of manual job searching.
 
-![alt text](image.png)
-
-RAG automation via Airflow
-
-![alt text](images/airflow.png)
-
 ## Status
 
 **This project is currently in active development.**
@@ -47,6 +41,10 @@ An intelligent agent that processes saved job postings using:
   - Salary information
 
 - **Vector Database Storage**: Stores processed job information in ChromaDB with embeddings for semantic search capabilities
+
+RAG automation via Airflow
+
+![alt text](images/airflow.png)
 
 - **RAG-powered Chat Interface**: Provides a conversational interface to query saved jobs using Retrieval-Augmented Generation, allowing you to:
   - Ask questions about saved jobs
