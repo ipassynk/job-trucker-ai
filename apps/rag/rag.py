@@ -1,7 +1,10 @@
 import json
 import os
+import sys
 from datetime import datetime
 from typing import Optional, List, Dict
+from pathlib import Path
+from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from bs4 import BeautifulSoup
 from langchain_core.prompts import ChatPromptTemplate
@@ -9,7 +12,17 @@ from langchain_ollama import ChatOllama, OllamaEmbeddings
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
-from database import get_vector_db
+
+# Add project root to Python path for imports
+project_root = Path(__file__).parent.parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+from apps.database import get_vector_db
+
+# Load .env from project root (../../.env relative to this file)
+env_path = Path(__file__).parent.parent.parent / '.env'
+load_dotenv(dotenv_path=env_path)
 
 
 class JobInfo(BaseModel):
@@ -35,9 +48,16 @@ def parse_html_with_bs4(html_content: str) -> str:
     """
     soup = BeautifulSoup(html_content, "html.parser")
 
-    # Remove script and style elements
-    for script in soup(["script", "style", "meta", "link"]):
-        script.decompose()
+    # Remove non-content elements (scripts, styles, navigation, forms, media, etc.)
+    elements_to_remove = [
+        "script", "style", "meta", "link", 
+        "nav", "header", "footer", "aside",  
+        "form", "button", "input", "select", "textarea", 
+        "iframe", "svg", "img", "canvas", "audio", "video", "embed", "object", 
+        "noscript", "template",
+    ]
+    for element in soup(elements_to_remove):
+        element.decompose()
 
     # Get text content
     text = soup.get_text(separator=" ", strip=True)
@@ -73,16 +93,28 @@ def extract_job_info(json_file_path: str) -> JobInfo:
 
     # Parse HTML using BeautifulSoup
     html_text = parse_html_with_bs4(html_content)
+    print(f"HTML text length: {len(html_text)} characters")
 
-    # Initialize LLM (using Ollama - ensure Ollama is running locally)
+    # Initialize LLM (using Ollama - ensure Ollama is running locally or accessible)
     # Default model is "llama3.2" but can be changed via environment variable
     ollama_model = os.getenv("OLLAMA_MODEL", "llama3.2")
-    llm = ChatOllama(
-        model=ollama_model,
-        temperature=0,
-        model_kwargs={"num_predict": -1},
-        verbose=True,
-    )
+    ollama_base_url = os.getenv("OLLAMA_BASE_URL")
+    # Get timeout from environment (default 5 minutes for large HTML processing)
+    ollama_timeout = int(os.getenv("OLLAMA_TIMEOUT", "300"))  # 5 minutes default
+    
+    llm_kwargs = {
+        "model": ollama_model,
+        "temperature": 0,
+        "model_kwargs": {
+            "num_predict": 4096,
+            "num_ctx": 4096,
+        },
+        "verbose": True,
+        "timeout": ollama_timeout,  # Add timeout to prevent hanging
+    }
+    if ollama_base_url:
+        llm_kwargs["base_url"] = ollama_base_url
+    llm = ChatOllama(**llm_kwargs)
 
     # Create output parser
     parser = PydanticOutputParser(pydantic_object=JobInfo)
@@ -93,13 +125,18 @@ def extract_job_info(json_file_path: str) -> JobInfo:
             (
                 "system",
                 """You are an expert at extracting job information from HTML content.
-        Extract the following information from the provided HTML:
-        - position_name: The job title or position name
-        - position_description: The full job description. Do not truncate the description.
-        - company: The company name
-        - salary: Salary information if available (leave as None if not found). Look for "Salary" or "Compensation" or any infor that has CA or dollar sign.
         
-        here are examples of salary information:
+        IMPORTANT: Extract information for ONLY ONE job posting. If the HTML contains multiple job listings, 
+        extract the PRIMARY job that matches the URL or the most prominent job in the content.
+        All fields must be SINGLE STRING VALUES, not arrays or lists.
+        
+        Extract the following information from the provided HTML:
+        - position_name: The job title or position name (single string, not a list)
+        - position_description: The full job description. Do not truncate the description. (single string, not a list)
+        - company: The company name (single string, not a list)
+        - salary: Salary information if available (leave as None if not found). Look for "Salary" or "Compensation" or any info that has CA or dollar sign. (single string or None, not a list)
+        
+        Here are examples of salary information:
         - Salary: $100,000 - $120,000 per year
         - Compensation: $100,000 - $120,000 per year
         - Salary: $100,000 - $120,000 per year
@@ -108,7 +145,7 @@ def extract_job_info(json_file_path: str) -> JobInfo:
 
         {format_instructions}
         
-        Focus on extracting accurate information from the HTML structure.""",
+        Focus on extracting accurate information from the HTML structure. Return only ONE job as a single object with string values.""",
             ),
             (
                 "human",
@@ -125,11 +162,22 @@ def extract_job_info(json_file_path: str) -> JobInfo:
     # Create chain
     chain = prompt | llm | parser
 
-    # Limit content to avoid token limits (keep first 80000 characters)
+    # Limit content to avoid token limits
     truncated_html = html_text[:80000] if len(html_text) > 80000 else html_text
 
     # Extract information
-    result = chain.invoke({"html_content": truncated_html, "url": url})
+    print(f"Invoking LLM chain with timeout of {ollama_timeout} seconds...")
+    print(f"HTML content length: {len(truncated_html)} characters")
+    print(f"Ollama model: {ollama_model}, base_url: {ollama_base_url or 'default'}")
+    
+    try:
+        print("Starting LLM chain invocation...")
+        result = chain.invoke({"html_content": truncated_html, "url": url})
+        
+    except Exception as e:
+        import traceback
+        print(f"Full traceback:\n{traceback.format_exc()}")
+        raise
 
     return result
 

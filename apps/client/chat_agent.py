@@ -1,8 +1,21 @@
 import os
+import sys
+from pathlib import Path
+from dotenv import load_dotenv
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_ollama import ChatOllama
 from langchain_core.output_parsers import StrOutputParser
-from .database import get_vector_db
+
+# Add project root to Python path for imports
+project_root = Path(__file__).parent.parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+from apps.database import get_vector_db
+
+# Load .env from project root (../../.env relative to this file)
+env_path = Path(__file__).parent.parent.parent / '.env'
+load_dotenv(dotenv_path=env_path)
 
 
 def create_jobs_agent():
@@ -22,10 +35,14 @@ def create_jobs_agent():
     
     # Initialize LLM (using Ollama)
     ollama_model = os.getenv("OLLAMA_MODEL", "llama3.2")
-    llm = ChatOllama(
-        model=ollama_model,
-        temperature=0.7,
-    )
+    ollama_base_url = os.getenv("OLLAMA_BASE_URL")
+    llm_kwargs = {
+        "model": ollama_model,
+        "temperature": 0.7,
+    }
+    if ollama_base_url:
+        llm_kwargs["base_url"] = ollama_base_url
+    llm = ChatOllama(**llm_kwargs)
     
     # Create a prompt template that restricts the agent to only talk about jobs in the database
     system_prompt = """You are a helpful assistant that answers questions about job postings. 

@@ -7,4 +7,4 @@ fi
 # Add project root to PYTHONPATH
 PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 export PYTHONPATH="${PYTHONPATH}:${PROJECT_ROOT}"
-python3 agent.py
+python3 rag.py

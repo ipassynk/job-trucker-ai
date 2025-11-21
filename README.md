@@ -4,6 +4,10 @@ A comprehensive job search automation tool that leverages Large Language Models 
 
 ![alt text](image.png)
 
+RAG automation via Airflow
+
+![alt text](images/airflow.png)
+
 ## Status
 
 **This project is currently in active development.**
@@ -160,6 +164,12 @@ Follow these steps to use the job assistant system:
     - The system will semantically search and answer based on your saved job postings.
 
 **Tip:** For more detailed setup of the browser extension, view the `extension/README.md`.
+
+# AIRFLOW setup
+curl -LfO 'https://airflow.apache.org/docs/apache-airflow/2.10.2/docker-compose.yaml'
+echo -e "AIRFLOW_UID=$(id -u)" > .env
+docker compose up airflow-init
+docker compose run
 
 
 
